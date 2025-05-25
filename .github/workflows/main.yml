@@ -1,0 +1,128 @@
+name: CI/CD Pipeline for C#
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET Core
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Run Tests
+        run: dotnet test --configuration Release --logger trx --results-directory TestResults
+
+      - name: Add test-passed label
+        if: success() && github.event_name == 'pull_request'
+        uses: studroid/label-pr-or-issue-action@v1
+        with:
+          label: "test-passed"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: csharp
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+      # Создание файла версии если он не существует
+      - name: Create version file if not exists
+        run: |
+          if [ ! -f version ]; then
+            echo "1.0.0" > version
+          fi
+
+      # Получение текущей версии
+      - name: Get current version
+        id: version
+        run: |
+          VERSION=$(cat version)
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Current version: ${VERSION}"
+
+      # Docker сборка и публикация
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            yourname/yourproject:${{ steps.version.outputs.version }}
+            yourname/yourproject:latest
+
+      # Создание changelog если его нет
+      - name: Create changelog if not exists
+        run: |
+          if [ ! -f changelog.md ]; then
+            echo "# Changelog" > changelog.md
+            echo "" >> changelog.md
+            echo "## [${{ steps.version.outputs.version }}] - $(date +%Y-%m-%d)" >> changelog.md
+            echo "- Initial release" >> changelog.md
+          fi
+
+      # Отправка уведомления в Telegram
+      - name: Send Telegram notification
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: |
+            🚀 Новый релиз ${{ steps.version.outputs.version }}
+            
+            Репозиторий: ${{ github.repository }}
+            Ветка: ${{ github.ref }}
+            Коммит: ${{ github.sha }}
+            
+            Посмотреть изменения: https://github.com/${{ github.repository }}/commit/${{ github.sha }}
+          document: changelog.md
+
+      # Деплой на PROD
+      - name: Deploy to Production
+        uses: TapTap21/docker-remote-deployment-action@v1.0
+        with:
+          remote_docker_host: user@your-server.com
+          ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          stack_file_name: docker-compose.yml
+          args: -p myapp up -d --pull always
+
+      # Создание релиза
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Release ${{ steps.version.outputs.version }}
+          body_path: changelog.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
