@@ -1,5 +1,7 @@
 permissions:
-  contents: read
+  contents: write
+  issues: write
+  pull-requests: write
   security-events: write
 
 name: CI/CD Pipeline for C#
