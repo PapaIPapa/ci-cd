@@ -41,6 +41,8 @@ jobs:
   version:
     runs-on: ubuntu-latest
     needs: [test, codeql]
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
       - name: Create version file if not exists
@@ -53,6 +55,7 @@ jobs:
         run: |
           VERSION=$(cat version)
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
 
   docker:
     runs-on: ubuntu-latest
