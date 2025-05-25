@@ -1,5 +1,7 @@
 permissions:
-  contents: read
+  contents: write
+  issues: write
+  pull-requests: write
   security-events: write
 
 name: CI/CD Pipeline for C#
@@ -47,16 +49,29 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+  
       - name: Create version file if not exists
         run: |
           if [ ! -f version ]; then
             echo "1.0.0" > version
           fi
+  
+      - name: List files in workspace
+        run: ls -l
+  
       - name: Get current version
         id: version
         run: |
           VERSION=$(cat version)
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
+  
+      - name: Upload version artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: version
+          path: version
+
+
 
   docker:
     runs-on: ubuntu-latest
@@ -123,10 +138,56 @@ jobs:
             Посмотреть изменения: https://github.com/${{ github.repository }}/commit/${{ github.sha }}
           document: changelog.md
 
+  tag:
+    runs-on: ubuntu-latest
+    needs: notify
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download version artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: version
+
+      - name: Set up git user
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump patch version, commit and push
+        id: bump_version
+        run: |
+          version=$(cat version)
+          # Разбиваем версию на части
+          IFS='.' read -r major minor patch <<< "$version"
+          patch=$((patch + 1))
+          new_version="${major}.${minor}.${patch}"
+          echo "$new_version" > version
+          echo "new_version=$new_version" >> $GITHUB_OUTPUT
+          git add version
+          git commit -m "Bump version to $new_version [ci skip]"
+          git push origin HEAD:${GITHUB_REF#refs/heads/}
+      - name: Create and push tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          new_version="${{ steps.bump_version.outputs.new_version }}"
+          tag="v$new_version"
+          # Проверяем, существует ли тег
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "Tag $tag already exists. Skipping."
+            exit 0
+          fi
+          git tag "$tag"
+          git push origin "$tag"
+
+
+
 
   release:
     runs-on: ubuntu-latest
-    needs: notify
+    needs: tag
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/checkout@v4
@@ -140,4 +201,5 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
