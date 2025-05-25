@@ -21,7 +21,7 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Run Tests
-        run: dotnet test .test/test.csproj --configuration Release --logger trx --results-directory TestResults
+        run: dotnet test ./test/test.csproj --configuration Release --logger trx --results-directory TestResults
 
       - name: Add test-passed label
         if: success() && github.event_name == 'pull_request'
