@@ -139,31 +139,48 @@ jobs:
           document: changelog.md
 
   tag:
-      runs-on: ubuntu-latest
-      needs: notify
-      steps:
-        - uses: actions/checkout@v4
-        - name: Download version artifact
-          uses: actions/download-artifact@v4
-          with:
-            name: version
-        - name: Set up git user
-          run: |
-            git config --global user.name "github-actions[bot]"
-            git config --global user.email "github-actions[bot]@users.noreply.github.com"
-        - name: Create and push tag
-          env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          run: |
-            VERSION=$(cat version)
-            TAG="v$VERSION"
-            # Проверяем, существует ли тег
-            if git rev-parse "$TAG" >/dev/null 2>&1; then
-              echo "Tag $TAG already exists. Skipping."
-              exit 0
-            fi
-            git tag "$TAG"
-            git push origin "$TAG"
+    runs-on: ubuntu-latest
+    needs: notify
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download version artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: version
+
+      - name: Set up git user
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump patch version, commit and push
+        id: bump_version
+        run: |
+          version=$(cat version)
+          # Разбиваем версию на части
+          IFS='.' read -r major minor patch <<< "$version"
+          patch=$((patch + 1))
+          new_version="${major}.${minor}.${patch}"
+          echo "$new_version" > version
+          echo "new_version=$new_version" >> $GITHUB_OUTPUT
+          git add version
+          git commit -m "Bump version to $new_version [ci skip]"
+          git push origin HEAD:${GITHUB_REF#refs/heads/}
+      - name: Create and push tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          new_version="${{ steps.bump_version.outputs.new_version }}"
+          tag="v$new_version"
+          # Проверяем, существует ли тег
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "Tag $tag already exists. Skipping."
+            exit 0
+          fi
+          git tag "$tag"
+          git push origin "$tag"
+
 
 
 
