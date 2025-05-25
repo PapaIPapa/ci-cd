@@ -49,16 +49,22 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+  
       - name: Create version file if not exists
         run: |
           if [ ! -f version ]; then
             echo "1.0.0" > version
           fi
+  
+      - name: List files in workspace
+        run: ls -l
+  
       - name: Get current version
         id: version
         run: |
           VERSION=$(cat version)
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
 
   docker:
     runs-on: ubuntu-latest
