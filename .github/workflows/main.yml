@@ -132,29 +132,32 @@ jobs:
           document: changelog.md
 
   tag:
-    runs-on: ubuntu-latest
-    needs: notify
-    steps:
-      - uses: actions/checkout@v4
+      runs-on: ubuntu-latest
+      needs: notify
+      steps:
+        - uses: actions/checkout@v4
+        - name: Download version artifact
+          uses: actions/download-artifact@v4
+          with:
+            name: version
+        - name: Set up git user
+          run: |
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        - name: Create and push tag
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          run: |
+            VERSION=$(cat version)
+            TAG="v$VERSION"
+            # Проверяем, существует ли тег
+            if git rev-parse "$TAG" >/dev/null 2>&1; then
+              echo "Tag $TAG already exists. Skipping."
+              exit 0
+            fi
+            git tag "$TAG"
+            git push origin "$TAG"
 
-      - name: Set up git user
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Create and push tag
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          VERSION=$(cat version)
-          TAG="v$VERSION"
-          # Проверяем, существует ли тег
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "Tag $TAG already exists. Skipping."
-            exit 0
-          fi
-          git tag "$TAG"
-          git push origin "$TAG"
 
 
   release:
