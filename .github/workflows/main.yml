@@ -7,6 +7,8 @@ name: CI/CD Pipeline for C#
 on:
   push:
     branches: [main, master]
+    tags:
+      - 'v*'
   pull_request:
     branches: [main, master]
   workflow_dispatch:
@@ -55,7 +57,6 @@ jobs:
         run: |
           VERSION=$(cat version)
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
-
 
   docker:
     runs-on: ubuntu-latest
@@ -112,9 +113,27 @@ jobs:
             Посмотреть изменения: https://github.com/${{ github.repository }}/commit/${{ github.sha }}
           document: changelog.md
 
+  deploy:
+    runs-on: self-hosted   # <--- локальный раннер для прода, как на схеме
+    needs: notify
+    environment:
+      name: prod
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to Production
+        run: |
+          docker pull smdmbsht/ci-cd:${{ needs.version.outputs.version }}
+          docker compose -f /path/to/your/docker-compose.yml up -d --pull always
+      - name: Add PROD tag to PR
+        if: github.event_name == 'pull_request'
+        run: |
+          gh pr edit ${{ github.event.pull_request.number }} --add-label PROD
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   release:
     runs-on: ubuntu-latest
-    needs: notify
+    needs: deploy
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/checkout@v4
