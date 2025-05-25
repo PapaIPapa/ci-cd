@@ -93,12 +93,22 @@ jobs:
             echo "## [${{ needs.version.outputs.version }}] - $(date +%Y-%m-%d)" >> changelog.md
             echo "- Initial release" >> changelog.md
           fi
+      - name: Upload changelog artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog
+          path: changelog.md
+
 
   notify:
     runs-on: ubuntu-latest
     needs: [docker, changelog, version]
     steps:
       - uses: actions/checkout@v4
+      - name: Download changelog artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: changelog
       - name: Send Telegram notification
         uses: appleboy/telegram-action@master
         with:
@@ -112,6 +122,7 @@ jobs:
             Коммит: ${{ github.sha }}
             Посмотреть изменения: https://github.com/${{ github.repository }}/commit/${{ github.sha }}
           document: changelog.md
+
 
   release:
     runs-on: ubuntu-latest
