@@ -115,6 +115,7 @@ jobs:
         with:
           remote_docker_host: user@your-server.com
           ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
           stack_file_name: docker-compose.yml
           args: -p myapp up -d --pull always
 
