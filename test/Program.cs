@@ -7,6 +7,10 @@ double dou = 4.5;
 bool Bool = true;
 
 
+
+
+//add1
+
 //if (Int > 100)
 //{
 //    dou = 10.5;
