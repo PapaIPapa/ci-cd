@@ -27,7 +27,7 @@ jobs:
         uses: studroid/label-pr-or-issue-action@v1
         with:
           label: "test-passed"
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.PAT_FOR_ACTIONS }}
 
   codeql:
     runs-on: ubuntu-latest
@@ -161,7 +161,7 @@ jobs:
           git push origin HEAD:${GITHUB_REF#refs/heads/}
       - name: Create and push tag
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PAT_FOR_ACTIONS }}
         run: |
           new_version="${{ steps.bump_version.outputs.new_version }}"
           tag="v$new_version"
