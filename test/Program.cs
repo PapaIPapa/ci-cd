@@ -7,6 +7,12 @@ double dou = 4.5;
 bool Bool = true;
 //add
 //add2
+//add3
+//add4
+//add5
+//add6
+//add7
+
 
 
 
